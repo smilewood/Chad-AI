@@ -1,3 +1,6 @@
+# import gc to work on garbage collection. use gc.collect() to run it.
+# then sleep for .1 sec to give it time.
+
 import torch
 import torch.nn as nn
 import time
@@ -38,7 +41,6 @@ class nnet:
 
         self.optimizer = torch.optim.Adam(Torchnn.parameters(self.network), lr=learning_rate)
         self.loss_func = nn.MSELoss()
-        self.errors = []
 
     def train(self, nIterations, X, T):
         startTime = time.time()
@@ -54,7 +56,6 @@ class nnet:
             # Forward pass
             outputs = self.network.forward(Xt)
             loss = self.loss_func(outputs, Tt)
-            self.errors.append(torch.sqrt(loss))
 
             # Backward and optimize
             self.optimizer.zero_grad()
