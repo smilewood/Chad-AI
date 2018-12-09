@@ -202,6 +202,9 @@ class ChadGame:
     def gameOver(self):
         return (len(self.black) + len(self.white)) < 4 or self.kings != 2
 
+    def conNetFormat(self):
+        return np.array([[[p.netRep() if p is not None else 0 for p in r] for r in self.board]])
+
     def networkFormat(self):
         return (p.netRep() if p is not None else 0 for r in self.board for p in r)
     """"
@@ -252,5 +255,6 @@ if __name__ == '__main__':
     game = ChadGame("riB",False)
     game.printBoard()
 
-    game.networkFormat()
 
+    print(game.conNetFormat())
+    print(game.conNetFormat().shape)

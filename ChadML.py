@@ -5,9 +5,10 @@ import ChadNN as nn
 import numpy as np
 import torch
 
+
 # python multiprocessing package
 
-def epsilonGreedy(epsilon, net, q, game, verbose = False):
+def epsilonGreedy(epsilon, net, q, game, verbose=False, conNet=True):
     validMoves = game.moves()
     gameState = game.networkFormat()
 
@@ -23,7 +24,11 @@ def epsilonGreedy(epsilon, net, q, game, verbose = False):
     else:
         # Greedy Move
         ls = list(gameState)
-        Qs = np.array([q.get((gameState,m), net.use(ls + list(m[0]) + list(m[1]))) for m in validMoves])
+        gr = game.conNetFormat()
+
+        Qs = np.array([q.get((gameState, m),
+                             net.use(ls + list(m[0]) + list(m[1])) if not
+                             conNet else net.cUse(gr, np.array(list(m[0]) + list(m[1])))) for m in validMoves])
         # print(Qs)
         moveChoice = validMoves[np.argmax(Qs)]
         Q = max(Qs)
@@ -32,10 +37,10 @@ def epsilonGreedy(epsilon, net, q, game, verbose = False):
 
 def reinforceAllMoves(q, moves, rho):
     for i in reversed(range(1, len(moves))):
-        q[moves[i-1]] += rho * (q[moves[i]] - q[moves[i - 1]])
+        q[moves[i - 1]] += rho * (q[moves[i]] - q[moves[i - 1]])
 
 
-def trainQ(maxGames, e, decay, rho, whiteNet, blackNet, verbose=False, whiteRandom = False, blackRandom = False):
+def trainQ(maxGames, e, decay, rho, whiteNet, blackNet, verbose=False, whiteRandom=False, blackRandom=False):
     trainQStartTime = time.time()
     print("Training {} games, epsilon starting at {}".format(maxGames, e))
     QWhite = {}
@@ -107,7 +112,7 @@ def trainQ(maxGames, e, decay, rho, whiteNet, blackNet, verbose=False, whiteRand
 
 
 # learningRates: epsilonDecay, rho, Net learning rate, net iterations, batch size
-def trainNetworks(maxGames, hiddens, rates, verbose=False, startE=1.0, whiteRandom = False, blackRandom = False):
+def trainNetworks(maxGames, hiddens, rates, verbose=False, startE=1.0, whiteRandom=False, blackRandom=False):
     print("Training start...")
     """    
     # Load log files
@@ -137,9 +142,10 @@ def trainNetworks(maxGames, hiddens, rates, verbose=False, startE=1.0, whiteRand
     epsilon = startE
     for i in range(0, maxGames, rates[4]):
 
-        outcomes, avgSteps, Qw, Qb, epsilon = trainQ(rates[4], epsilon, rates[0], rates[1], whiteNet, blackNet, verbose, whiteRandom=whiteRandom, blackRandom=blackRandom)
-        #Out.append(outcomes)
-        #Step.append(avgSteps)
+        outcomes, avgSteps, Qw, Qb, epsilon = trainQ(rates[4], epsilon, rates[0], rates[1], whiteNet, blackNet, verbose,
+                                                     whiteRandom=whiteRandom, blackRandom=blackRandom)
+        # Out.append(outcomes)
+        # Step.append(avgSteps)
         if verbose:
             print("{} Games complete".format(str(i + rates[4])))
             print("Outcomes: White {}; Black {}; Draw {}".format(outcomes[2], outcomes[0], outcomes[1]))
@@ -163,7 +169,7 @@ def trainNetworks(maxGames, hiddens, rates, verbose=False, startE=1.0, whiteRand
     '''
 
 
-def trainNetwork(net, q, iterations, file = None):
+def trainNetwork(net, q, iterations, file=None):
     X = np.zeros([len(q), 148])
     T = np.zeros([len(q), 1])
     i = 0
@@ -177,7 +183,7 @@ def trainNetwork(net, q, iterations, file = None):
 
 
 games = 10000
-networkStructure = [200, 100, 100, 50, 50]
+networkStructure = [500, 200, 200, 100, 100, 50, 50]
 trainingRates = (.9999, .2, .05, 100, 500)
 epsilonStart = 1.0
 
@@ -191,7 +197,8 @@ def bestMove(game, turn):
 
         game = gm.ChadGame(game, turn)
         move = epsilonGreedy(0, net, {}, game)[0]
-        print(chr(move[0][0] + ord('a')) + chr(move[0][1] + ord('A')) + chr(move[1][0] + ord('a')) + chr(move[1][1] + ord('A')))
+        print(chr(move[0][0] + ord('a')) + chr(move[0][1] + ord('A')) + chr(move[1][0] + ord('a')) + chr(
+            move[1][1] + ord('A')))
     except FileNotFoundError:
         print("No network file found")
         exit(1)
@@ -204,4 +211,5 @@ def train():
 if __name__ == '__main__':
     # import cProfile
     # cProfile.run("train()")
+    print("run")
     train()
