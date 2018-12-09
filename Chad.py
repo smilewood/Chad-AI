@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 whiteCastle = {(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)}
 blackCastle = {(7, 7), (7, 8), (7, 9), (8, 7), (8, 8), (8, 9), (9, 7), (9, 8), (9, 9)}
@@ -162,9 +163,7 @@ class ChadGame:
     def moves(self):
         moves = []
         for p in (self.black if self.turn else self.white):
-            # print (p)
             m = p.validMoves(self.board)
-            # print(m)
             moves.extend([(p.pos, move) for move in m])
         return moves
 
@@ -174,13 +173,9 @@ class ChadGame:
     def move(self, move):
         start = move[0]
         dest = move[1]
-        #print(move)
 
         movePiece = self.getPieceAt(start)
-        #print(movePiece)
-        #print(self.getPieceAt(dest))
         if movePiece is None:
-            #print("No piece at", dest)
             return
         if self.getPieceAt(dest) is not None and self.getPieceAt(dest).type == 'k':
             self.kings -= 1
@@ -198,9 +193,17 @@ class ChadGame:
         #self.printBoard()
 
         return self
+    def tryMove(self, move):
+        game = copy.copy(self)
+        game.move(move)
+        assert game.networkFormat() != self.networkFormat()
+        return game
 
     def gameOver(self):
         return (len(self.black) + len(self.white)) < 4 or self.kings != 2
+
+    def conNetFormat(self):
+        return np.array([[[p.netRep() if p is not None else 0 for p in r] for r in self.board]])
 
     def networkFormat(self):
         return (p.netRep() if p is not None else 0 for r in self.board for p in r)
@@ -252,5 +255,6 @@ if __name__ == '__main__':
     game = ChadGame("riB",False)
     game.printBoard()
 
-    game.networkFormat()
 
+    print(game.conNetFormat())
+    print(game.conNetFormat().shape)

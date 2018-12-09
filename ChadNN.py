@@ -1,3 +1,6 @@
+# import gc to work on garbage collection. use gc.collect() to run it.
+# then sleep for .1 sec to give it time.
+
 import torch
 import torch.nn as nn
 import time
@@ -24,6 +27,56 @@ class Torchnn(nn.Module):
         out = self.output(out)
         return out
 
+class TorchCnn(nn.Module):
+    def __init__(self, hidden_units, n_outputs):
+        super(TorchCnn, self).__init__()
+
+        self.CL1 = nn.Sequential(
+            #(12x12x1)
+            nn.Conv2d(1, 16, kernel_size=5, stride=1, padding=2),
+            #(12x12x16)
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2))
+        #(6x6x16)
+        self.CL2 = nn.Sequential(
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            #(6X6X32)
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2))
+            #(3x3x32)
+        self.CL3 = nn.Sequential(
+            nn.Conv2d(32, 48, kernel_size=3, stride=1, padding=0),
+            #(3x3x48)
+            nn.ReLU())
+        self.l1 = nn.Linear(292, hidden_units[0])
+        self.hidden = nn.ModuleList()
+        for i in range(1, len(hidden_units)):
+            self.hidden.append(nn.Linear(hidden_units[i - 1], hidden_units[i]))
+        self.tanh = nn.Tanh()
+        self.output = nn.Linear(hidden_units[-1], n_outputs)
+# pass the board through a convolution, then add the move at the linear layers
+
+    def forward(self, board, move):
+        X = board.unsqueeze_(0)
+
+
+        out = self.CL1(X)
+
+
+        out = self.CL2(out)
+
+
+        #out = self.CL3(out)
+        #print(out.shape)
+
+        out = torch.flatten(out, start_dim=0, end_dim=-1)
+        out = torch.cat((out, move), 0)
+        out = self.l1(out)
+        for i in range(len(self.hidden)):
+            out = self.tanh(self.hidden[i](out))
+        out = self.output(out)
+        return out
+
 
 class nnet:
     def __init__(self, ni, nhs, no, learning_rate):
@@ -32,13 +85,15 @@ class nnet:
         print('Running on', self.device)
 
         self.network = Torchnn(ni, nhs, no).double()
+        self.conNet = TorchCnn(nhs, no).double()
 
         if self.device == "cuda":
             self.network.cuda()
+            self.conNet.cuda()
 
         self.optimizer = torch.optim.Adam(Torchnn.parameters(self.network), lr=learning_rate)
+        self.cOptimizer = torch.optim.Adam(Torchnn.parameters(self.conNet), lr=learning_rate)
         self.loss_func = nn.MSELoss()
-        self.errors = []
 
     def train(self, nIterations, X, T):
         startTime = time.time()
@@ -54,7 +109,6 @@ class nnet:
             # Forward pass
             outputs = self.network.forward(Xt)
             loss = self.loss_func(outputs, Tt)
-            self.errors.append(torch.sqrt(loss))
 
             # Backward and optimize
             self.optimizer.zero_grad()
@@ -62,6 +116,39 @@ class nnet:
             self.optimizer.step()
 
         print('Training took {} seconds'.format(time.time() - startTime))
+
+    def cTrain(self, boards, moves, targets, iterations):
+        startTime = time.time()
+        Xboard = torch.from_numpy(boards).double()
+        Xmove = torch.from_numpy(moves).double()
+        T = torch.from_numpy(targets).double()
+        if self.device == "cuda":
+            Xboard = Xboard.cuda()
+            Xmove = Xmove.cuda()
+            T = T.cuda()
+        for i in range(iterations):
+            outputs = self.conNet.forward(Xboard, Xmove)
+            loss = self.loss_func(outputs, T)
+
+            self.cOptimizer.zero_grad()
+            loss.backward()
+            self.cOptimizer.step()
+        print('Training took {} seconds'.format(time.time() - startTime))
+
+
+    def cUse(self, board, move):
+        with torch.no_grad():
+            Xboard = torch.from_numpy(board).double()
+            Xmove = torch.from_numpy(move).double()
+            if self.device == "cuda":
+                Xboard = Xboard.cuda()
+                Xmove = Xmove.cuda()
+
+            res = self.conNet.forward(Xboard, Xmove)
+
+            if self.device == "cuda":
+                res = res.cpu()
+            return list(res.numpy())
 
     def use(self, X):
         with torch.no_grad():
